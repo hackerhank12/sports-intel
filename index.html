@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roku Sports Intel — Research Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #060608;
+  --s1: #0e0e14;
+  --s2: #16161f;
+  --s3: #1e1e2a;
+  --border: #252535;
+  --border2: #2e2e42;
+  --rok: #6c19ff;
+  --rok2: #8b45ff;
+  --cyan: #00d4ff;
+  --gold: #ffb800;
+  --red: #ff3d5a;
+  --green: #00e676;
+  --text: #e2e2ee;
+  --muted: #6666aa;
+  --muted2: #4a4a78;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+}
+
+/* Noise overlay */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9999; opacity: 0.4;
+}
+
+/* Scanline */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none; z-index: 9998;
+}
+
+/* ── HEADER ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  position: sticky; top: 0; z-index: 100;
+}
+
+.header-left { display: flex; align-items: center; gap: 20px; }
+
+.brand {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: #fff;
+}
+.brand span { color: var(--rok2); }
+
+.version {
+  font-size: 9px; letter-spacing: 2px; color: var(--muted);
+  border: 1px solid var(--border2); border-radius: 3px;
+  padding: 2px 8px; text-transform: uppercase;
+}
+
+.live-indicator {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; color: var(--green); letter-spacing: 1.5px;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 8px var(--green);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── NAV TABS ── */
+.nav {
+  display: flex; gap: 2px;
+  padding: 12px 32px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  overflow-x: auto;
+}
+.nav-tab {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 10px 20px; cursor: pointer;
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--muted); background: transparent;
+  transition: all 0.15s; white-space: nowrap;
+}
+.nav-tab:hover { color: var(--text); background: var(--s2); }
+.nav-tab.active {
+  color: #fff; background: var(--s2);
+  border-color: var(--border); border-bottom-color: var(--s2);
+  position: relative; bottom: -1px;
+}
+.nav-tab .tab-num {
+  display: inline-block; width: 16px; height: 16px;
+  background: var(--rok); border-radius: 3px;
+  font-size: 9px; text-align: center; line-height: 16px;
+  color: #fff; margin-right: 6px; font-weight: 600;
+}
+.nav-tab.active .tab-num { background: var(--cyan); color: #000; }
+
+/* ── MAIN ── */
+.main { max-width: 1000px; margin: 0 auto; padding: 32px; }
+
+.agent-panel { display: none; }
+.agent-panel.active { display: block; }
+
+/* ── AGENT HEADER ── */
+.agent-header { margin-bottom: 28px; }
+.agent-eyebrow {
+  font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--cyan); margin-bottom: 8px;
+}
+.agent-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px; letter-spacing: 2px; color: #fff;
+  line-height: 1; margin-bottom: 6px;
+}
+.agent-desc { font-size: 12px; color: var(--muted); line-height: 1.6; font-family: 'IBM Plex Sans', sans-serif; }
+
+/* ── FORM ── */
+.form-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.form-row.single { grid-template-columns: 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); font-weight: 500;
+}
+select, input[type="text"], textarea {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  -webkit-appearance: none;
+}
+textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+select:focus, input:focus, textarea:focus { border-color: var(--rok2); }
+option { background: var(--s2); }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chip {
+  font-size: 10px; letter-spacing: 0.5px;
+  padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  border: 1px solid var(--border2); color: var(--muted);
+  background: var(--s2); transition: all 0.15s;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.chip:hover { border-color: var(--rok2); color: var(--text); }
+.chip.on { background: var(--rok); border-color: var(--rok); color: #fff; }
+
+.go-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--rok) 0%, var(--rok2) 100%);
+  border: none; border-radius: 8px;
+  color: #fff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px; letter-spacing: 3px;
+  padding: 14px; cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.go-btn:hover { opacity: 0.88; }
+.go-btn:active { transform: scale(0.99); }
+.go-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── LOADER ── */
+.loader {
+  display: none; padding: 48px 24px; text-align: center;
+}
+.loader.show { display: block; }
+.loader-grid {
+  display: inline-grid; grid-template-columns: repeat(5, 8px);
+  gap: 4px; margin-bottom: 20px;
+}
+.loader-cell {
+  width: 8px; height: 8px; border-radius: 2px;
+  background: var(--rok);
+  animation: cell-pulse 1.2s ease-in-out infinite;
+}
+.loader-cell:nth-child(1){animation-delay:0s}
+.loader-cell:nth-child(2){animation-delay:0.1s}
+.loader-cell:nth-child(3){animation-delay:0.2s}
+.loader-cell:nth-child(4){animation-delay:0.3s}
+.loader-cell:nth-child(5){animation-delay:0.4s}
+@keyframes cell-pulse { 0%,100%{opacity:0.15;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+.loader-msg { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+/* ── RESULT ── */
+.result-card {
+  display: none;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.result-card.show { display: block; animation: fadeup 0.3s ease; }
+@keyframes fadeup { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.result-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--s2);
+  border-bottom: 1px solid var(--border);
+}
+.result-title { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px; color: var(--text); }
+.result-actions { display: flex; gap: 8px; }
+.action-btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 1px;
+  padding: 5px 12px; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--border2); color: var(--muted);
+  background: transparent; transition: all 0.15s;
+}
+.action-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+.result-body { padding: 24px; }
+
+/* result content styles */
+.r-summary {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px; color: var(--muted); line-height: 1.75;
+  border-left: 3px solid var(--rok); padding-left: 14px;
+  margin-bottom: 24px;
+}
+
+.r-section { margin-bottom: 22px; }
+.r-section-head {
+  font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.r-section-head::after { content:''; flex:1; height:1px; background: var(--border); }
+
+.r-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rok);
+  border-radius: 6px; padding: 14px 16px;
+  margin-bottom: 8px;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.r-card.red { border-left-color: var(--red); }
+.r-card.gold { border-left-color: var(--gold); }
+.r-card.green { border-left-color: var(--green); }
+.r-card.cyan { border-left-color: var(--cyan); }
+
+.r-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.r-card-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; letter-spacing: 1.5px; padding: 3px 8px;
+  border-radius: 3px; text-transform: uppercase; white-space: nowrap;
+}
+.badge-red { background: rgba(255,61,90,0.15); color: var(--red); border: 1px solid rgba(255,61,90,0.25); }
+.badge-gold { background: rgba(255,184,0,0.12); color: var(--gold); border: 1px solid rgba(255,184,0,0.2); }
+.badge-green { background: rgba(0,230,118,0.1); color: var(--green); border: 1px solid rgba(0,230,118,0.2); }
+
+.r-card p { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.r-card .exploit { font-size: 11px; color: var(--green); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
+
+.opp-box {
+  background: rgba(108,25,255,0.07);
+  border: 1px solid rgba(108,25,255,0.2);
+  border-radius: 8px; padding: 18px 20px; margin-top: 16px;
+}
+.opp-box-head {
+  font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--rok2); margin-bottom: 12px;
+}
+.opp-list { list-style: none; }
+.opp-list li {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px; color: var(--muted);
+  padding: 5px 0 5px 18px; position: relative; line-height: 1.6;
+}
+.opp-list li::before { content:'▸'; position:absolute; left:0; color:var(--rok2); }
+
+/* ── HISTORY ── */
+.history { margin-top: 28px; }
+.history-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.history-label { font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted2); }
+.history-count {
+  font-size: 9px; background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 2px 10px; color: var(--muted2);
+}
+.history-items { display: flex; flex-direction: column; gap: 6px; }
+.history-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 14px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.history-item:hover { border-color: var(--rok2); }
+.hi-name { font-size: 11px; color: var(--text); }
+.hi-meta { font-size: 10px; color: var(--muted2); }
+.history-empty { font-size: 11px; color: var(--muted2); text-align: center; padding: 16px 0; }
+
+/* ── ERROR ── */
+.error-msg {
+  background: rgba(255,61,90,0.08); border: 1px solid rgba(255,61,90,0.2);
+  border-radius: 8px; padding: 16px 20px;
+  font-size: 12px; color: var(--red); line-height: 1.6;
+}
+
+@media(max-width:600px){
+  .header { padding: 14px 16px; }
+  .nav { padding: 10px 16px 0; }
+  .main { padding: 20px 16px; }
+  .form-row { grid-template-columns: 1fr; }
+  .agent-title { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+<div id="key-screen" style="position:fixed;inset:0;background:#060608;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:IBM Plex Mono,monospace"><div style="background:#0e0e14;border:1px solid #252535;border-radius:12px;padding:40px;width:100%;max-width:420px;text-align:center"><div style="font-family:Bebas Neue,sans-serif;font-size:32px;letter-spacing:3px;color:#fff;margin-bottom:8px">ROKU <span style="color:#8b45ff">SPORTS</span></div><div style="font-size:11px;color:#6666aa;letter-spacing:2px;margin-bottom:32px">RESEARCH SUITE v1.0</div><div style="font-size:10px;color:#6666aa;letter-spacing:2px;text-transform:uppercase;text-align:left;margin-bottom:8px">Groq API Key</div><input id="key-input" type="password" placeholder="gsk_..." style="width:100%;background:#16161f;border:1px solid #2e2e42;border-radius:6px;color:#e2e2ee;font-family:IBM Plex Mono,monospace;font-size:13px;padding:12px 14px;outline:none;margin-bottom:8px"><div style="font-size:10px;color:#4a4a78;margin-bottom:20px;text-align:left">Get a free key at console.groq.com — never stored, session only</div><button onclick="submitKey()" style="width:100%;background:linear-gradient(135deg,#6c19ff,#8b45ff);border:none;border-radius:8px;color:#fff;font-family:Bebas Neue,sans-serif;font-size:18px;letter-spacing:3px;padding:14px;cursor:pointer">ENTER DASHBOARD</button></div></div><div class="header">
+  <div class="header-left">
+    <div class="brand">ROKU <span>SPORTS</span></div>
+    <div class="version">Research Suite v1.0</div>
+  </div>
+  <div class="live-indicator"><div class="live-dot"></div>GROQ CONNECTED</div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" onclick="switchTab(0)"><span class="tab-num">1</span>Competitive Intel</div>
+  <div class="nav-tab" onclick="switchTab(1)"><span class="tab-num">2</span>League & Sports News</div>
+  <div class="nav-tab" onclick="switchTab(2)"><span class="tab-num">3</span>Advertiser Insights</div>
+</div>
+
+<div class="main">
+
+  <!-- ══════════════════════════════════════════
+       AGENT 1 — COMPETITIVE INTEL
+  ══════════════════════════════════════════ -->
+  <div class="agent-panel active" id="panel-0">
+    <div class="agent-header">
+      <div class="agent-eyebrow">// Agent 01 — Streaming Landscape</div>
+      <div class="agent-title">Competitive Intel Engine</div>
+      <div class="agent-desc">Analyze competitor streaming platforms' sports sponsorship strategies, ad products, and league deals. Identify gaps and Roku opportunities.</div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-row">
+        <div class="field">
+          <span class="field-label">Platform Focus</span>
+          <select id="a1-platform">
+            <option value="all">All Major Competitors</option>
+            <option value="Peacock">Peacock</option>
+            <option value="Amazon Prime Video">Amazon Prime Video</option>
+            <option value="ESPN+">ESPN+</option>
+            <option value="YouTube TV">YouTube TV</option>
+            <option value="Paramount+">Paramount+</option>
+            <option value="Apple TV+">Apple TV+</option>
+            <option value="Hulu">Hulu</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Sport / League</span>
+          <select id="a1-sport">
+            <option value="all sports">All Sports</option>
+            <option value="NFL">NFL</option>
+            <option value="NBA">NBA</option>
+            <option value="MLB">MLB</option>
+            <option value="NHL">NHL</option>
+            <option value="MLS / Soccer">MLS / Soccer</option>
+            <option value="College Sports">College Sports</option>
+            <option value="Golf">Golf</option>
+            <option value="NASCAR">NASCAR</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row single">
+        <div class="field">
+          <span class="field-label">Custom Focus (optional)</span>
+          <input type="text" id="a1-custom" placeholder="e.g. pause ads, branded zones, live game overlays..." />
+        </div>
+      </div>
+      <div class="field-label" style="margin-bottom:8px;">Intel Types</div>
+      <div class="chip-row" id="a1-chips">
+        <span class="chip on" data-v="Sponsorship Packages">Sponsorship Packages</span>
+        <span class="chip on" data-v="Ad Products">Ad Products</span>
+        <span class="chip on" data-v="League Deals">League Deals</span>
+        <span class="chip on" data-v="Viewership Trends">Viewership Trends</span>
+        <span class="chip" data-v="Pricing Intel">Pricing Intel</span>
+        <span class="chip" data-v="Market Gaps">Market Gaps</span>
+        <span class="chip" data-v="Audience Data">Audience Data</span>
+      </div>
+      <button class="go-btn" id="a1-btn" onclick="runAgent1()">▶ RUN INTEL QUERY</button>
+    </div>
+
+    <div class="loader" id="a1-loader">
+      <div class="loader-grid">
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div>
+      </div>
+      <div class="loader-msg" id="a1-msg">Scanning competitive landscape...</div>
+    </div>
+
+    <div class="result-card" id="a1-result">
+      <div class="result-topbar">
+        <span class="result-title" id="a1-result-title">Intel Report</span>
+        <div class="result-actions">
+          <button class="action-btn" onclick="copyResult('a1-result-body')">⎘ Copy</button>
+          <button class="action-btn" onclick="saveToHistory('a1')">+ Save</button>
+        </div>
+      </div>
+      <div class="result-body" id="a1-result-body"></div>
+    </div>
+
+    <div class="history">
+      <div class="history-head">
+        <span class="history-label">// Query History</span>
+        <span class="history-count" id="a1-hist-count">0 reports</span>
+      </div>
+      <div class="history-items" id="a1-hist-list">
+        <div class="history-empty">No reports yet — run your first query above.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       AGENT 2 — SPORTS NEWS TRACKER
+  ══════════════════════════════════════════ -->
+  <div class="agent-panel" id="panel-1">
+    <div class="agent-header">
+      <div class="agent-eyebrow">// Agent 02 — Market Intelligence</div>
+      <div class="agent-title">League & Sports News Tracker</div>
+      <div class="agent-desc">Track sports rights movements, viewership data, league deal trends, and emerging opportunities relevant to Roku's sports strategy.</div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-row">
+        <div class="field">
+          <span class="field-label">League / Sport</span>
+          <select id="a2-league">
+            <option value="all major sports leagues">All Leagues</option>
+            <option value="NFL">NFL</option>
+            <option value="NBA">NBA</option>
+            <option value="MLB">MLB</option>
+            <option value="NHL">NHL</option>
+            <option value="MLS">MLS</option>
+            <option value="UEFA / Champions League">UEFA / Champions League</option>
+            <option value="College Football / Basketball">College Sports</option>
+            <option value="Golf (PGA Tour)">Golf (PGA Tour)</option>
+            <option value="NASCAR">NASCAR</option>
+            <option value="Olympics">Olympics</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Time Horizon</span>
+          <select id="a2-horizon">
+            <option value="current cycle (2024-2025 season)">Current Season</option>
+            <option value="next 12 months">Next 12 Months</option>
+            <option value="upcoming rights renewals and deals">Upcoming Rights Renewals</option>
+            <option value="long-term (3-5 year outlook)">Long-Term Outlook</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-label" style="margin-bottom:8px;">Track These Signals</div>
+      <div class="chip-row" id="a2-chips">
+        <span class="chip on" data-v="Rights Deals">Rights Deals</span>
+        <span class="chip on" data-v="Viewership Trends">Viewership Trends</span>
+        <span class="chip on" data-v="Streaming Migration">Streaming Migration</span>
+        <span class="chip" data-v="Sponsor Moves">Sponsor Moves</span>
+        <span class="chip" data-v="League Revenue">League Revenue</span>
+        <span class="chip" data-v="Fan Demographics">Fan Demographics</span>
+        <span class="chip" data-v="Emerging Sports">Emerging Sports</span>
+      </div>
+      <div class="form-row single" style="margin-bottom:16px;">
+        <div class="field">
+          <span class="field-label">Strategic Question (optional)</span>
+          <input type="text" id="a2-question" placeholder="e.g. Which leagues have expiring rights deals Roku should target?" />
+        </div>
+      </div>
+      <button class="go-btn" id="a2-btn" onclick="runAgent2()">▶ RUN NEWS TRACKER</button>
+    </div>
+
+    <div class="loader" id="a2-loader">
+      <div class="loader-grid">
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div>
+      </div>
+      <div class="loader-msg" id="a2-msg">Scanning sports landscape...</div>
+    </div>
+
+    <div class="result-card" id="a2-result">
+      <div class="result-topbar">
+        <span class="result-title" id="a2-result-title">Sports Intel Report</span>
+        <div class="result-actions">
+          <button class="action-btn" onclick="copyResult('a2-result-body')">⎘ Copy</button>
+          <button class="action-btn" onclick="saveToHistory('a2')">+ Save</button>
+        </div>
+      </div>
+      <div class="result-body" id="a2-result-body"></div>
+    </div>
+
+    <div class="history">
+      <div class="history-head">
+        <span class="history-label">// Query History</span>
+        <span class="history-count" id="a2-hist-count">0 reports</span>
+      </div>
+      <div class="history-items" id="a2-hist-list">
+        <div class="history-empty">No reports yet — run your first query above.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       AGENT 3 — ADVERTISER INSIGHTS
+  ══════════════════════════════════════════ -->
+  <div class="agent-panel" id="panel-2">
+    <div class="agent-header">
+      <div class="agent-eyebrow">// Agent 03 — Demand Intelligence</div>
+      <div class="agent-title">Advertiser Insight Engine</div>
+      <div class="agent-desc">Surface advertiser spending patterns by category, identify high-value targets for sports sponsorships, and build demand-side intelligence for Roku's sales team.</div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-row">
+        <div class="field">
+          <span class="field-label">Advertiser Category</span>
+          <select id="a3-category">
+            <option value="all major advertiser categories">All Categories</option>
+            <option value="Auto">Auto</option>
+            <option value="Financial Services / Insurance">Financial Services</option>
+            <option value="QSR / Fast Food">QSR / Fast Food</option>
+            <option value="Beer / Alcohol">Beer / Alcohol</option>
+            <option value="Telecom">Telecom</option>
+            <option value="Technology / Consumer Electronics">Tech / Consumer Electronics</option>
+            <option value="Retail / E-Commerce">Retail / E-Commerce</option>
+            <option value="Pharma / Healthcare">Pharma / Healthcare</option>
+            <option value="Gaming / Betting">Gaming / Betting</option>
+            <option value="CPG / Packaged Goods">CPG / Packaged Goods</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">Sport Context</span>
+          <select id="a3-sport">
+            <option value="all sports">All Sports</option>
+            <option value="NFL">NFL</option>
+            <option value="NBA">NBA</option>
+            <option value="MLB">MLB</option>
+            <option value="NHL">NHL</option>
+            <option value="Soccer / MLS">Soccer / MLS</option>
+            <option value="Golf">Golf</option>
+            <option value="College Sports">College Sports</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-label" style="margin-bottom:8px;">Insight Focus</div>
+      <div class="chip-row" id="a3-chips">
+        <span class="chip on" data-v="Spending Trends">Spending Trends</span>
+        <span class="chip on" data-v="Top Spenders">Top Spenders</span>
+        <span class="chip on" data-v="Roku Fit Score">Roku Fit Score</span>
+        <span class="chip" data-v="Competitive Spend">Competitive Spend</span>
+        <span class="chip" data-v="Audience Alignment">Audience Alignment</span>
+        <span class="chip" data-v="Pitch Angles">Pitch Angles</span>
+        <span class="chip" data-v="Budget Cycles">Budget Cycles</span>
+      </div>
+      <div class="form-row single" style="margin-bottom:16px;">
+        <div class="field">
+          <span class="field-label">Specific Advertiser or Brief (optional)</span>
+          <input type="text" id="a3-advertiser" placeholder="e.g. Toyota, State Farm, or 'brands spending on live sports streaming'" />
+        </div>
+      </div>
+      <button class="go-btn" id="a3-btn" onclick="runAgent3()">▶ RUN ADVERTISER INTEL</button>
+    </div>
+
+    <div class="loader" id="a3-loader">
+      <div class="loader-grid">
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div><div class="loader-cell"></div>
+        <div class="loader-cell"></div>
+      </div>
+      <div class="loader-msg" id="a3-msg">Analyzing advertiser landscape...</div>
+    </div>
+
+    <div class="result-card" id="a3-result">
+      <div class="result-topbar">
+        <span class="result-title" id="a3-result-title">Advertiser Intel Report</span>
+        <div class="result-actions">
+          <button class="action-btn" onclick="copyResult('a3-result-body')">⎘ Copy</button>
+          <button class="action-btn" onclick="saveToHistory('a3')">+ Save</button>
+        </div>
+      </div>
+      <div class="result-body" id="a3-result-body"></div>
+    </div>
+
+    <div class="history">
+      <div class="history-head">
+        <span class="history-label">// Query History</span>
+        <span class="history-count" id="a3-hist-count">0 reports</span>
+      </div>
+      <div class="history-items" id="a3-hist-list">
+        <div class="history-empty">No reports yet — run your first query above.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+let GROQ_KEY = sessionStorage.getItem("groq_key") || "";
+function submitKey() { const k = document.getElementById("key-input").value.trim(); if (!k.startsWith("gsk_")) { alert("Please enter a valid Groq key starting with gsk_"); return; } GROQ_KEY = k; sessionStorage.setItem("groq_key", k); document.getElementById("key-screen").style.display = "none"; } if (GROQ_KEY) { document.getElementById("key-screen").style.display = "none"; } const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "llama-3.3-70b-versatile";
+
+const history = { a1: [], a2: [], a3: [] };
+
+// ── TAB SWITCHING ──
+function switchTab(i) {
+  document.querySelectorAll('.nav-tab').forEach((t,j) => t.classList.toggle('active', i===j));
+  document.querySelectorAll('.agent-panel').forEach((p,j) => p.classList.toggle('active', i===j));
+}
+
+// ── CHIPS ──
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+
+function getChips(id) {
+  return [...document.querySelectorAll(`#${id} .chip.on`)].map(c => c.dataset.v).join(', ');
+}
+
+// ── GROQ CALL ──
+async function callGroq(prompt) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      temperature: 0.7,
+      max_tokens: 1400,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Groq API error');
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+// ── LOADER HELPERS ──
+const msgs1 = ['Scanning competitive landscape...','Mapping platform strategies...','Identifying league deals...','Surfacing market gaps...','Compiling Roku opportunities...'];
+const msgs2 = ['Scanning sports landscape...','Tracking rights movements...','Analyzing viewership data...','Mapping streaming trends...','Building strategic brief...'];
+const msgs3 = ['Analyzing advertiser landscape...','Scanning spending patterns...','Scoring Roku fit...','Building pitch angles...','Finalizing demand intel...'];
+
+function startLoader(id, msgs) {
+  const el = document.getElementById(`${id}-msg`);
+  let i = 0;
+  return setInterval(() => { i = (i+1)%msgs.length; el.textContent = msgs[i]; }, 1800);
+}
+
+function showLoader(id) { document.getElementById(`${id}-loader`).classList.add('show'); }
+function hideLoader(id) { document.getElementById(`${id}-loader`).classList.remove('show'); }
+function showResult(id) { document.getElementById(`${id}-result`).classList.add('show'); }
+function hideResult(id) { document.getElementById(`${id}-result`).classList.remove('show'); }
+
+// ══════════════════════════════════════════
+// AGENT 1 — COMPETITIVE INTEL
+// ══════════════════════════════════════════
+async function runAgent1() {
+  const platform = document.getElementById('a1-platform').value;
+  const sport = document.getElementById('a1-sport').value;
+  const custom = document.getElementById('a1-custom').value;
+  const chips = getChips('a1-chips');
+  if (!chips) { alert('Select at least one intel type.'); return; }
+
+  const btn = document.getElementById('a1-btn');
+  btn.disabled = true;
+  hideResult('a1');
+  showLoader('a1');
+  const interval = startLoader('a1', msgs1);
+
+  const platformLabel = document.getElementById('a1-platform').options[document.getElementById('a1-platform').selectedIndex].text;
+  const sportLabel = document.getElementById('a1-sport').options[document.getElementById('a1-sport').selectedIndex].text;
+
+  const prompt = `You are a senior competitive intelligence analyst for Roku's Sports Content Monetization Strategy team.
+
+Generate a detailed competitive intel report. Parameters:
+- Platform Focus: ${platformLabel}
+- Sport/League: ${sportLabel}
+- Custom Focus: ${custom || 'General sports sponsorship landscape'}
+- Intel Types: ${chips}
+
+Respond ONLY with a valid JSON object, no markdown, no backticks, no preamble:
+{
+  "report_title": "string (concise, punchy)",
+  "summary": "2-3 sentence executive summary of the competitive landscape",
+  "competitors": [
+    {
+      "platform": "Platform Name",
+      "threat_level": "HIGH or MEDIUM or LOW",
+      "color": "red or gold or green",
+      "headline": "One sharp finding headline",
+      "detail": "2-3 sentences on their sports sponsorship approach, packages, and differentiators. Be specific.",
+      "weakness": "One specific exploitable weakness for Roku"
+    }
+  ],
+  "market_trends": ["trend 1 (1-2 sentences)", "trend 2", "trend 3"],
+  "roku_opportunities": ["specific opportunity 1", "opportunity 2", "opportunity 3", "opportunity 4"],
+  "key_differentiator": "Roku's single strongest competitive advantage in one sentence"
+}`;
+
+  try {
+    const raw = await callGroq(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const r = JSON.parse(clean);
+
+    clearInterval(interval); hideLoader('a1');
+    document.getElementById('a1-result-title').textContent = r.report_title || 'Competitive Intel Report';
+    document.getElementById('a1-result-body').innerHTML = renderCompetitiveReport(r);
+    showResult('a1');
+    addHistory('a1', r.report_title, `${platformLabel} · ${sportLabel}`, r);
+
+  } catch(e) {
+    clearInterval(interval); hideLoader('a1');
+    document.getElementById('a1-result-title').textContent = 'Error';
+    document.getElementById('a1-result-body').innerHTML = `<div class="error-msg">Failed to generate report. Check your API key or try again.<br><small>${e.message}</small></div>`;
+    showResult('a1');
+  }
+  btn.disabled = false;
+}
+
+function renderCompetitiveReport(r) {
+  const bm = { HIGH:'badge-red', MEDIUM:'badge-gold', LOW:'badge-green' };
+  return `
+    <div class="r-summary">${r.summary}</div>
+    <div class="r-section">
+      <div class="r-section-head">Platform Analysis</div>
+      ${r.competitors.map(c=>`
+        <div class="r-card ${c.color||''}">
+          <div class="r-card-head">
+            <span class="r-card-name">${c.platform}</span>
+            <span class="badge ${bm[c.threat_level]||'badge-gold'}">${c.threat_level} THREAT</span>
+          </div>
+          <p><strong style="color:var(--text)">${c.headline}</strong></p>
+          <p style="margin-top:5px">${c.detail}</p>
+          <div class="exploit">⚡ EXPLOIT → ${c.weakness}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="r-section">
+      <div class="r-section-head">Market Trends</div>
+      ${r.market_trends.map(t=>`<div class="r-card gold"><p>${t}</p></div>`).join('')}
+    </div>
+    <div class="opp-box">
+      <div class="opp-box-head">// Roku Opportunities</div>
+      <ul class="opp-list">${r.roku_opportunities.map(o=>`<li>${o}</li>`).join('')}</ul>
+      <hr style="border:none;border-top:1px solid rgba(108,25,255,0.2);margin:14px 0">
+      <p style="font-size:12px;color:var(--text);font-family:'IBM Plex Sans',sans-serif"><span style="color:var(--rok2);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px">KEY EDGE → </span>${r.key_differentiator}</p>
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+// AGENT 2 — SPORTS NEWS TRACKER
+// ══════════════════════════════════════════
+async function runAgent2() {
+  const league = document.getElementById('a2-league').options[document.getElementById('a2-league').selectedIndex].text;
+  const horizon = document.getElementById('a2-horizon').value;
+  const question = document.getElementById('a2-question').value;
+  const chips = getChips('a2-chips');
+
+  const btn = document.getElementById('a2-btn');
+  btn.disabled = true;
+  hideResult('a2');
+  showLoader('a2');
+  const interval = startLoader('a2', msgs2);
+
+  const prompt = `You are a sports media analyst briefing Roku's Sports Content Monetization Strategy team.
+
+Generate a sports intelligence brief. Parameters:
+- League/Sport: ${league}
+- Time Horizon: ${horizon}
+- Signals to Track: ${chips}
+- Strategic Question: ${question || 'What are the biggest opportunities for Roku in sports streaming?'}
+
+Respond ONLY with valid JSON, no markdown, no backticks:
+{
+  "report_title": "string",
+  "summary": "2-3 sentence strategic overview",
+  "developments": [
+    {
+      "title": "Development headline",
+      "category": "Rights Deal or Viewership or Streaming or Sponsorship or Demographic",
+      "color": "cyan or gold or green or red",
+      "detail": "2-3 sentences of specific intelligence. Be concrete with numbers/data where possible.",
+      "roku_angle": "How Roku can act on or benefit from this"
+    }
+  ],
+  "watchlist": ["item to watch 1", "item to watch 2", "item to watch 3"],
+  "strategic_recommendation": "One clear strategic recommendation for Roku based on this intelligence"
+}`;
+
+  try {
+    const raw = await callGroq(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const r = JSON.parse(clean);
+
+    clearInterval(interval); hideLoader('a2');
+    document.getElementById('a2-result-title').textContent = r.report_title || 'Sports Intel Brief';
+    document.getElementById('a2-result-body').innerHTML = renderNewsReport(r);
+    showResult('a2');
+    addHistory('a2', r.report_title, `${league} · ${horizon}`, r);
+
+  } catch(e) {
+    clearInterval(interval); hideLoader('a2');
+    document.getElementById('a2-result-title').textContent = 'Error';
+    document.getElementById('a2-result-body').innerHTML = `<div class="error-msg">Failed to generate report. Check your API key or try again.<br><small>${e.message}</small></div>`;
+    showResult('a2');
+  }
+  btn.disabled = false;
+}
+
+function renderNewsReport(r) {
+  return `
+    <div class="r-summary">${r.summary}</div>
+    <div class="r-section">
+      <div class="r-section-head">Key Developments</div>
+      ${r.developments.map(d=>`
+        <div class="r-card ${d.color||'cyan'}">
+          <div class="r-card-head">
+            <span class="r-card-name">${d.title}</span>
+            <span class="badge badge-gold">${d.category}</span>
+          </div>
+          <p>${d.detail}</p>
+          <div class="exploit">▸ ROKU ANGLE → ${d.roku_angle}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="r-section">
+      <div class="r-section-head">Watchlist</div>
+      ${r.watchlist.map(w=>`<div class="r-card gold"><p>${w}</p></div>`).join('')}
+    </div>
+    <div class="opp-box">
+      <div class="opp-box-head">// Strategic Recommendation</div>
+      <p style="font-size:13px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.7">${r.strategic_recommendation}</p>
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+// AGENT 3 — ADVERTISER INSIGHTS
+// ══════════════════════════════════════════
+async function runAgent3() {
+  const category = document.getElementById('a3-category').options[document.getElementById('a3-category').selectedIndex].text;
+  const sport = document.getElementById('a3-sport').options[document.getElementById('a3-sport').selectedIndex].text;
+  const advertiser = document.getElementById('a3-advertiser').value;
+  const chips = getChips('a3-chips');
+
+  const btn = document.getElementById('a3-btn');
+  btn.disabled = true;
+  hideResult('a3');
+  showLoader('a3');
+  const interval = startLoader('a3', msgs3);
+
+  const prompt = `You are a media investment analyst building demand-side intelligence for Roku's Sports sales team.
+
+Generate an advertiser insight report. Parameters:
+- Advertiser Category: ${category}
+- Sport Context: ${sport}
+- Specific Advertiser or Brief: ${advertiser || 'Top spenders in this category'}
+- Insight Focus: ${chips}
+
+Respond ONLY with valid JSON, no markdown, no backticks:
+{
+  "report_title": "string",
+  "summary": "2-3 sentence overview of this category's sports spending posture",
+  "advertisers": [
+    {
+      "name": "Brand or sub-category name",
+      "spend_posture": "Growing or Stable or Shifting or Emerging",
+      "color": "green or cyan or gold or red",
+      "spending_intel": "2 sentences on their sports media spend patterns and priorities",
+      "roku_fit": "HIGH or MEDIUM or LOW",
+      "pitch_angle": "One sharp Roku pitch angle for this brand"
+    }
+  ],
+  "category_trends": ["trend 1", "trend 2", "trend 3"],
+  "roku_pitch_themes": ["pitch theme 1 that resonates with this category", "theme 2", "theme 3"],
+  "best_package_fit": "Which type of Roku sports sponsorship package best fits this advertiser category and why"
+}`;
+
+  try {
+    const raw = await callGroq(prompt);
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const r = JSON.parse(clean);
+
+    clearInterval(interval); hideLoader('a3');
+    document.getElementById('a3-result-title').textContent = r.report_title || 'Advertiser Intel Report';
+    document.getElementById('a3-result-body').innerHTML = renderAdvertiserReport(r);
+    showResult('a3');
+    addHistory('a3', r.report_title, `${category} · ${sport}`, r);
+
+  } catch(e) {
+    clearInterval(interval); hideLoader('a3');
+    document.getElementById('a3-result-title').textContent = 'Error';
+    document.getElementById('a3-result-body').innerHTML = `<div class="error-msg">Failed to generate report. Check your API key or try again.<br><small>${e.message}</small></div>`;
+    showResult('a3');
+  }
+  btn.disabled = false;
+}
+
+function renderAdvertiserReport(r) {
+  const fm = { HIGH:'badge-green', MEDIUM:'badge-gold', LOW:'badge-red' };
+  return `
+    <div class="r-summary">${r.summary}</div>
+    <div class="r-section">
+      <div class="r-section-head">Advertiser Profiles</div>
+      ${r.advertisers.map(a=>`
+        <div class="r-card ${a.color||'cyan'}">
+          <div class="r-card-head">
+            <span class="r-card-name">${a.name}</span>
+            <div style="display:flex;gap:6px">
+              <span class="badge badge-gold">${a.spend_posture}</span>
+              <span class="badge ${fm[a.roku_fit]||'badge-gold'}">ROKU FIT: ${a.roku_fit}</span>
+            </div>
+          </div>
+          <p>${a.spending_intel}</p>
+          <div class="exploit">▸ PITCH → ${a.pitch_angle}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="r-section">
+      <div class="r-section-head">Category Trends</div>
+      ${r.category_trends.map(t=>`<div class="r-card gold"><p>${t}</p></div>`).join('')}
+    </div>
+    <div class="opp-box">
+      <div class="opp-box-head">// Roku Pitch Themes</div>
+      <ul class="opp-list">${r.roku_pitch_themes.map(t=>`<li>${t}</li>`).join('')}</ul>
+      <hr style="border:none;border-top:1px solid rgba(108,25,255,0.2);margin:14px 0">
+      <p style="font-size:12px;color:var(--text);font-family:'IBM Plex Sans',sans-serif"><span style="color:var(--rok2);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px">BEST PACKAGE FIT → </span>${r.best_package_fit}</p>
+    </div>`;
+}
+
+// ── HISTORY ──
+function addHistory(agent, title, meta, data) {
+  const ts = new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  history[agent].unshift({ title, meta, ts, data });
+  renderHistory(agent);
+}
+
+function renderHistory(agent) {
+  const list = document.getElementById(`${agent}-hist-list`);
+  const count = document.getElementById(`${agent}-hist-count`);
+  count.textContent = `${history[agent].length} reports`;
+  if (!history[agent].length) {
+    list.innerHTML = '<div class="history-empty">No reports yet.</div>'; return;
+  }
+  list.innerHTML = history[agent].map((h,i)=>`
+    <div class="history-item" onclick="loadHistory('${agent}',${i})">
+      <div><div class="hi-name">${h.title}</div><div class="hi-meta">${h.meta}</div></div>
+      <div class="hi-meta">${h.ts}</div>
+    </div>`).join('');
+}
+
+function loadHistory(agent, i) {
+  const h = history[agent][i];
+  if (agent==='a1') { document.getElementById('a1-result-title').textContent=h.title; document.getElementById('a1-result-body').innerHTML=renderCompetitiveReport(h.data); showResult('a1'); }
+  if (agent==='a2') { document.getElementById('a2-result-title').textContent=h.title; document.getElementById('a2-result-body').innerHTML=renderNewsReport(h.data); showResult('a2'); }
+  if (agent==='a3') { document.getElementById('a3-result-title').textContent=h.title; document.getElementById('a3-result-body').innerHTML=renderAdvertiserReport(h.data); showResult('a3'); }
+}
+
+function saveToHistory(agent) {
+  const title = document.getElementById(`${agent}-result-title`).textContent;
+  alert(`"${title}" saved to session history.`);
+}
+
+// ── COPY ──
+function copyResult(id) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btns = document.querySelectorAll('.action-btn');
+    btns.forEach(b=>{ if(b.textContent.includes('Copy')){ b.textContent='✓ Copied'; setTimeout(()=>b.textContent='⎘ Copy',2000); }});
+  });
+}
+</script>
+</body>
+</html>
